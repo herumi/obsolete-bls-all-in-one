@@ -8,4 +8,5 @@ before_install:
   - sudo apt install -y libgmp-dev
 script:
   - make test
+  - make run_go
  
