@@ -1,4 +1,6 @@
 all:
+	$(MAKE) -C bls
+test:
 	$(MAKE) -C bls test
 run_go:
 	$(MAKE) -C bls run_go
