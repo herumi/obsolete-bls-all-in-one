@@ -7,10 +7,12 @@ run_go:
 clean:
 	$(MAKE) -C bls clean
 
-update: build_mcl update_mcl update_xbyak update_cybozulib update_bls
+update: build update_mcl update_xbyak update_cybozulib update_bls
 
-build_mcl:
+.PHONY: build
+build:
 	$(MAKE) -C ../mcl
+	$(MAKE) -C ../bls test
 
 update_mcl:
 	rm -rf mcl
@@ -30,7 +32,7 @@ update_xbyak:
 	cp -a ../xbyak/xbyak/*.h xbyak/xbyak/
 	cp -a $(addprefix ../xbyak/,COPYRIGHT readme.md) xbyak/
 
-CYBOZULIB_HEADERS=$(shell python get-depend-header.py ../mcl/obj)
+CYBOZULIB_HEADERS=$(shell python get-depend-header.py ../mcl/obj ../bls/obj)
 update_cybozulib:
 	rm -rf cybozulib
 	mkdir -p cybozulib/include/cybozu

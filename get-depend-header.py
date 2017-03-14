@@ -13,13 +13,14 @@ def get_dependency(fname):
 
 def main():
 	if len(sys.argv) == 1:
-		print "get-depend-header.py <obj-dir>"
+		print "get-depend-header.py <obj-dir> [<obj-dir2>...]"
 		return 1
-	depDir = sys.argv[1] + '/'
 	s = set()
-	for fname in os.listdir(depDir):
-		if fname.endswith('.d'):
-			s = s.union(get_dependency(depDir + fname))
+	for i in xrange(1, len(sys.argv)):
+		depDir = sys.argv[i] + '/'
+		for fname in os.listdir(depDir):
+			if fname.endswith('.d'):
+				s = s.union(get_dependency(depDir + fname))
 	for h in s:
 		print h,
 
