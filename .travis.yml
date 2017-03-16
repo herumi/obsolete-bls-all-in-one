@@ -7,6 +7,9 @@ compiler:
 before_install:
   - sudo apt install -y libgmp-dev
 script:
-  - make test
-  - make run_go
+  - make UNIT=4 test
+  - make UNIT=4 run_go
+  - make clean
+  - make UNIT=6 test
+  - make UNIT=6 run_go
  

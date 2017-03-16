@@ -43,9 +43,13 @@ size_t getStrT(const Outer *p, char *buf, size_t maxBufSize)
 	return 0;
 }
 
-void blsInit()
+void blsInit(int curve, int maxUnitSize)
 {
-	bls::init();
+	bls::init(curve, maxUnitSize);
+}
+size_t blsGetOpUnitSize()
+{
+	return bls::getOpUnitSize();
 }
 
 blsId *blsIdCreate()

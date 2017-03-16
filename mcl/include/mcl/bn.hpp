@@ -199,6 +199,16 @@ struct MapToT {
 	}
 };
 
+struct GLV {
+	mpz_class p;
+	mpz_class v;
+	inline void init(const mpz_class& p)
+	{
+		this->p = p;
+		this->v = gmp::getQuadraticNonResidue(p);
+	}
+};
+
 template<class Fp>
 struct ParamT {
 	typedef Fp2T<Fp> Fp2;

@@ -6,6 +6,9 @@
 	@license modified new BSD license
 	http://opensource.org/licenses/BSD-3-Clause
 */
+#ifndef BLS_MAX_OP_UNIT_SIZE
+	#error "define BLS_MAX_OP_UNIT_SIZE 4(or 6)"
+#endif
 
 #include <stdint.h> // for uint64_t, uint8_t
 #include <stdlib.h> // for size_t
@@ -18,23 +21,30 @@
 extern "C" {
 #endif
 
+enum {
+	BlsCurveFp254BNb = 0,
+	BlsCurveFp382_1 = 1,
+	BlsCurveFp382_2 = 2
+};
+
 typedef struct {
-	uint64_t buf[4];
+	uint64_t buf[BLS_MAX_OP_UNIT_SIZE];
 } blsId;
 
 typedef struct {
-	uint64_t buf[4];
+	uint64_t buf[BLS_MAX_OP_UNIT_SIZE];
 } blsSecretKey;
 
 typedef struct {
-	uint64_t buf[4 * 2 * 3];
+	uint64_t buf[BLS_MAX_OP_UNIT_SIZE * 2 * 3];
 } blsPublicKey;
 
 typedef struct {
-	uint64_t buf[4 * 3];
+	uint64_t buf[BLS_MAX_OP_UNIT_SIZE * 3];
 } blsSign;
 
-void blsInit(void);
+void blsInit(int curve, int maxUnitSize);
+size_t blsGetOpUnitSize(void);
 
 blsId *blsIdCreate(void);
 void blsIdDestroy(blsId *id);
@@ -50,7 +60,8 @@ int blsIdSetStr(blsId *id, const char *buf, size_t bufSize);
 */
 size_t blsIdGetStr(const blsId *id, char *buf, size_t maxBufSize);
 /*
-	access p[0], p[1], p[2], p[3]
+	access p[0], ..., p[3] if 256-bit curve
+	access p[0], ..., p[5] if 384-bit curve
 */
 void blsIdSet(blsId *id, const uint64_t *p);
 
