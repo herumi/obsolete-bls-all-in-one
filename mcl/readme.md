@@ -116,6 +116,10 @@ mcl::bn256::BN::pairing(e, P, Q);
 
 See [test/bn_test.cpp](https://github.com/herumi/mcl/blob/master/test/bn_test.cpp).
 
+## Default constructor of Fp, Ec, etc.
+A default constructor does not initialize the instance.
+Set a valid value before reffering it.
+
 ## String format of G1 and G2
 G1 and G2 have three elements of Fp (x, y, z) for Jacobi coordinate.
 normalize() method normalizes it to affine coordinate (x, y, 1) or (0, 0, 0).
@@ -161,12 +165,10 @@ Benchmark on Skylake(3.4GHz)
 
 ```
 # mcl::bn::CurveFp382_1 ; -(2^94 + 2^76 + 2^72 + 1)
-pairing   3.534Mclk  ; 1.039msec
-finalExp   1.478Mclk
+pairing   3.163Mclk  ; 0.93msec
 
 # mcl::bn::CurveFp382_2 ; -(2^94 + 2^78 + 2^67 + 2^64 + 2^48 + 1)
-pairing   3.635Mclk  ; 1.069msec
-finalExp   1.536Mclk
+pairing   3.261Mclk  ; 0.96msec
 ```
 
 # How to make asm files (optional)
@@ -213,6 +215,8 @@ This library contains [mie](https://github.com/herumi/mie/) and [Lifted-ElGamal]
   Pairing 2010, ([preprint](http://eprint.iacr.org/2010/354))
 * [_Faster hashing to G2_](http://dx.doi.org/10.1007/978-3-642-28496-0_25),Laura Fuentes-Castañeda,  Edward Knapp,  Francisco Rodríguez-Henríquez,
   SAC 2011, ([preprint](https://eprint.iacr.org/2008/530))
+* [_Skew Frobenius Map and Efficient Scalar Multiplication for Pairing–Based Cryptography_](https://www.researchgate.net/publication/221282560_Skew_Frobenius_Map_and_Efficient_Scalar_Multiplication_for_Pairing-Based_Cryptography),
+Y. Sakemi, Y. Nogami, K. Okeya, Y. Morikawa, CANS 2008.
 
 # Author
 

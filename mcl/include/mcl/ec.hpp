@@ -61,12 +61,9 @@ public:
 	*/
 	static bool verifyOrder_;
 	static mpz_class order_;
-#ifdef MCL_EC_USE_AFFINE
-	EcT() : inf_(true) {}
-#else
-	/* can't call z.clear() beforing Fp::init() */
-	EcT() { memset(&z, 0, sizeof(z)); }
-#endif
+	static void (*mulArrayGLV)(EcT& z, const EcT& x, const fp::Unit *y, size_t yn, bool isNegative, bool constTime);
+	/* default constructor is undefined value */
+	EcT() {}
 	EcT(const Fp& _x, const Fp& _y)
 	{
 		set(_x, _y);
@@ -188,10 +185,14 @@ public:
 		verify the order of *this is equal to order if order != 0
 		in constructor, set, setStr, operator<<().
 	*/
-	static  inline void setOrder(const mpz_class& order)
+	static void setOrder(const mpz_class& order)
 	{
 		verifyOrder_ = order != 0;
 		order_ = order;
+	}
+	static void setMulArrayGLV(void f(EcT& z, const EcT& x, const fp::Unit *y, size_t yn, bool isNegative, bool constTime))
+	{
+		mulArrayGLV = f;
 	}
 	// backward compatilibity
 	static inline void setParam(const std::string& astr, const std::string& bstr, int mode = ec::Jacobi)
@@ -595,11 +596,6 @@ public:
 		y.getBlock(b);
 		mulArray(z, x, b.p, b.n, false, true);
 	}
-	static inline void mulCT(EcT& z, const EcT& x, int y)
-	{
-		const fp::Unit u = abs(y);
-		mulArray(z, x, &u, 1, y < 0, true);
-	}
 	static inline void mulCT(EcT& z, const EcT& x, const mpz_class& y)
 	{
 		mulArray(z, x, gmp::getUnit(y), abs(y.get_mpz_t()->_mp_size), y < 0, true);
@@ -737,7 +733,9 @@ public:
 	static inline void getYfromX(Fp& y, const Fp& x, bool isYodd)
 	{
 		getWeierstrass(y, x);
-		if (!Fp::squareRoot(y, y)) throw cybozu::Exception("EcT:getYfromX") << x << isYodd;
+		if (!Fp::squareRoot(y, y)) {
+			throw cybozu::Exception("EcT:getYfromX") << x << isYodd;
+		}
 		if (y.isOdd() ^ isYodd) {
 			Fp::neg(y, y);
 		}
@@ -770,10 +768,16 @@ public:
 	bool operator>=(const EcT& rhs) const { return !operator<(rhs); }
 	bool operator>(const EcT& rhs) const { return rhs < *this; }
 	bool operator<=(const EcT& rhs) const { return !operator>(rhs); }
-private:
 	static inline void mulArray(EcT& z, const EcT& x, const fp::Unit *y, size_t yn, bool isNegative, bool constTime = false)
 	{
-		x.normalize();
+		if (mulArrayGLV && yn * 2 > Fp::BaseFp::getOp().N) {
+			mulArrayGLV(z, x, y, yn, isNegative, constTime);
+			return;
+		}
+		mulArrayBase(z, x, y, yn, isNegative, constTime);
+	}
+	static inline void mulArrayBase(EcT& z, const EcT& x, const fp::Unit *y, size_t yn, bool isNegative, bool constTime)
+	{
 		EcT tmp;
 		const EcT *px = &x;
 		if (&z == &x) {
@@ -781,11 +785,7 @@ private:
 			px = &tmp;
 		}
 		z.clear();
-		if (constTime) {
-			fp::powGenericCT(z, *px, y, yn, EcT::add, EcT::dbl);
-		} else {
-			fp::powGeneric(z, *px, y, yn, EcT::add, EcT::dbl);
-		}
+		fp::powGeneric(z, *px, y, yn, EcT::add, EcT::dbl, constTime);
 		if (isNegative) {
 			neg(z, z);
 		}
@@ -798,6 +798,7 @@ template<class Fp> int EcT<Fp>::specialA_;
 template<class Fp> bool EcT<Fp>::compressedExpression_;
 template<class Fp> bool EcT<Fp>::verifyOrder_;
 template<class Fp> mpz_class EcT<Fp>::order_;
+template<class Fp> void (*EcT<Fp>::mulArrayGLV)(EcT& z, const EcT& x, const fp::Unit *y, size_t yn, bool isNegative, bool constTime);
 #ifndef MCL_EC_USE_AFFINE
 template<class Fp> int EcT<Fp>::mode_;
 #endif

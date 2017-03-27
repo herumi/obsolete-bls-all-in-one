@@ -199,6 +199,160 @@ struct MapToT {
 	}
 };
 
+/*
+	Skew Frobenius Map and Efficient Scalar Multiplication for Pairing-Based Cryptography
+	Y. Sakemi, Y. Nogami, K. Okeya, H. Kato, Y. Morikawa
+*/
+template<class Fp>
+struct GLV {
+	typedef mcl::EcT<Fp> G1;
+	Fp w; // (-1 + sqrt(-3)) / 2
+	mpz_class r;
+	mpz_class z;
+	bool isNegative;
+	mpz_class v; // 6z^2 + 4z + 1 > 0
+	mpz_class c; // 2z + 1
+	void init(const mpz_class& r, const mpz_class& z, bool isNegative)
+	{
+		if (!Fp::squareRoot(w, -3)) throw cybozu::Exception("GLV:init");
+		w = (w - 1) / 2;
+		this->r = r;
+		this->z = z;
+		this->isNegative = isNegative;
+		v = 1 + z * (4 + z * 6);
+		c = 2 * z + 1;
+	}
+	/*
+		(p^2 mod r) (x, y) = (wx, -y)
+	*/
+	void mulP2(G1& Q, const G1& P) const
+	{
+		Fp::mul(Q.x, P.x, w);
+		Fp::neg(Q.y, P.y);
+		Q.z = P.z;
+	}
+	/*
+		s = ap^2 + b mod r
+		assume(s < r);
+	*/
+	void getAB(mpz_class& a, mpz_class& b, const mpz_class& s) const
+	{
+		assert(0 < s && s < r);
+		/*
+			s = s1 * v + s2                  // s1 = s / v, s2 = s % v
+			= s1 * c * p^2 + s2              // vP = cp^2 P
+			= (s3 * v + s4) * p^2 + s2       // s3 = (s1 * c) / v, s4 = (s1 * c) % v
+			= (s3 * c * p^2 + s4) * p^2 + s2
+			= (s3 * c) * p^4 + s4 * p^2 + s2 // s5 = s3 * c, p^4 = p^2 - 1
+			= s5 * (p^2 - 1) + s4 * p^2 + s2
+			= (s4 + s5) * p^2 + (s2 - s5)
+		*/
+		mpz_class t;
+		mcl::gmp::divmod(a, t, s, v); // a = t / v, t = t % v
+		a *= c;
+		mcl::gmp::divmod(b, a, a, v); // b = a / v, a = a % v
+		b *= c;
+		a += b;
+		b = t - b;
+	}
+	void mul(G1& Q, G1 P, mpz_class x, bool constTime = false) const
+	{
+		x %= r;
+		if (x == 0) {
+			Q.clear();
+			return;
+		}
+		if (x < 0) {
+			G1::neg(P, P);
+			x = -x;
+		}
+		mpz_class a, b;
+		getAB(a, b, x);
+		// Q = (ap^2 + b)P
+		G1 A, B;
+		mulP2(A, P);
+		if (b < 0) {
+			b = -b;
+			G1::neg(P, P);
+		}
+		assert(a >= 0);
+		assert(b >= 0);
+#if 1
+		size_t nA = mcl::gmp::getBitSize(a);
+		size_t nB = mcl::gmp::getBitSize(b);
+		size_t n = std::max(nA, nB);
+		assert(n > 0);
+#if 0 // slow
+		G1 tbl[16];
+		tbl[0].clear();
+		tbl[1] = A;
+		G1::dbl(tbl[2], tbl[1]);
+		G1::add(tbl[3], tbl[2], tbl[1]);
+		for (int i = 1; i < 4; i++) {
+			for (int j = 0; j < 4; j++) {
+				G1::add(tbl[i * 4 + j], tbl[(i - 1) * 4 + j], P);
+			}
+		}
+		for (int i = 1; i < 16; i++) {
+			tbl[i].normalize();
+		}
+		if (n & 1) {
+			n--;
+			bool ai = mcl::gmp::testBit(a, n);
+			bool bi = mcl::gmp::testBit(b, n);
+			unsigned int idx = bi * 4 + ai;
+			Q = tbl[idx];
+			if (n == 0) return;
+		} else {
+			Q.clear();
+		}
+		for (int i = (int)n - 2; i >= 0; i -= 2) {
+			G1::dbl(Q, Q);
+			G1::dbl(Q, Q);
+			bool a0 = mcl::gmp::testBit(a, i + 0);
+			bool a1 = mcl::gmp::testBit(a, i + 1);
+			bool b0 = mcl::gmp::testBit(b, i + 0);
+			bool b1 = mcl::gmp::testBit(b, i + 1);
+			unsigned int c = b1 * 8 + b0 * 4 + a1 * 2 + a0;
+			if (c > 0) {
+				Q += tbl[c];
+			}
+		}
+#else
+		G1 tbl[4];
+		tbl[1] = A; tbl[1].normalize();
+		tbl[2] = P; tbl[2].normalize();
+		tbl[3] = A + P; tbl[3].normalize();
+		Q.clear();
+		if (constTime) {
+			tbl[0] = tbl[1];
+			for (int i = (int)n - 1; i >= 0; i--) {
+				G1::dbl(Q, Q);
+				bool ai = mcl::gmp::testBit(a, i);
+				bool bi = mcl::gmp::testBit(b, i);
+				unsigned int c = bi * 2 + ai;
+				Q += tbl[c];
+			}
+		} else {
+			for (int i = (int)n - 1; i >= 0; i--) {
+				G1::dbl(Q, Q);
+				bool ai = mcl::gmp::testBit(a, i);
+				bool bi = mcl::gmp::testBit(b, i);
+				unsigned int c = bi * 2 + ai;
+				if (c > 0) {
+					Q += tbl[c];
+				}
+			}
+		}
+#endif
+#else
+		G1::mul(A, A, a);
+		G1::mul(B, P, b);
+		G1::add(Q, A, B);
+#endif
+	}
+};
+
 template<class Fp>
 struct ParamT {
 	typedef Fp2T<Fp> Fp2;
@@ -231,6 +385,7 @@ struct ParamT {
 	mpz_class exp_c1;
 	mpz_class exp_c2;
 	MapToT<Fp> mapTo;
+	GLV<Fp> glv;
 
 	// Loop parameter for the Miller loop part of opt. ate pairing.
 	typedef std::vector<int8_t> SignVec;
@@ -265,6 +420,7 @@ struct ParamT {
 		G2::init(0, b_div_xi, mcl::ec::Proj);
 		G2::setOrder(r);
 		mapTo.init(2 * p - r);
+		glv.init(r, z, isNegative);
 
 		Fp2::pow(g[0], xi, (p - 1) / 6); // g = xi^((p-1)/6)
 		for (size_t i = 1; i < gN; i++) {
@@ -329,9 +485,17 @@ struct BNT {
 	typedef mcl::Fp2DblT<Fp> Fp2Dbl;
 	typedef ParamT<Fp> Param;
 	static Param param;
+	static void mulArrayGLV(G1& z, const G1& x, const mcl::fp::Unit *y, size_t yn, bool isNegative, bool constTime)
+	{
+		mpz_class s;
+		mcl::gmp::setArray(s, y, yn);
+		if (isNegative) s = -s;
+		param.glv.mul(z, x, s, constTime);
+	}
 	static void init(const mcl::bn::CurveParam& cp = CurveFp254BNb, fp::Mode mode = fp::FP_AUTO)
 	{
 		param.init(cp, mode);
+		G1::setMulArrayGLV(mulArrayGLV);
 	}
 	/*
 		Frobenius
