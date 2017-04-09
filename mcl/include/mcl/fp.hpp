@@ -43,14 +43,15 @@ enum IoMode {
 	IoBinPrefix = IoBin | IoPrefix,
 	IoHexPrefix = IoHex | IoPrefix,
 	IoArray = 32, // array of Unit(fixed size)
-	IoArrayRaw = 64 // raw array of Unit without Montgomery conversion
+	IoArrayRaw = 64, // raw array of Unit without Montgomery conversion
+	IoTight = 128 // tight repr of Ec
 };
 
 namespace fp {
 
 static inline const char* getIoSeparator(int ioMode)
 {
-	return (ioMode & (IoArray | IoArrayRaw)) ? "" : " ";
+	return (ioMode & (IoArray | IoArrayRaw | IoTight)) ? "" : " ";
 }
 
 static inline int detectIoMode(int ioMode, const std::ios_base& ios)
@@ -75,6 +76,10 @@ void arrayToStr(std::string& str, const Unit *x, size_t n, int base, bool withPr
 */
 bool strToMpzArray(size_t *pBitSize, Unit *y, size_t maxBitSize, mpz_class& x, const std::string& str, int base);
 
+// copy src to dst as little endian
+void copyUnitToByteAsLE(uint8_t *dst, const Unit *src, size_t byteSize);
+// copy src to dst as little endian
+void copyByteToUnitAsLE(Unit *dst, const uint8_t *src, size_t byteSize);
 void copyAndMask(Unit *y, const void *x, size_t xByteSize, const Op& op, bool doMask);
 
 uint64_t getUint64(bool *pb, const fp::Block& b);
@@ -98,7 +103,9 @@ template<class tag = FpTag, size_t maxBitSize = MCL_MAX_BIT_SIZE>
 class FpT : public fp::Operator<FpT<tag, maxBitSize> > {
 	typedef fp::Unit Unit;
 	typedef fp::Operator<FpT<tag, maxBitSize> > Operator;
+public:
 	static const size_t maxSize = (maxBitSize + fp::UnitBitSize - 1) / fp::UnitBitSize;
+private:
 	template<class tag2, size_t maxBitSize2> friend class FpT;
 	Unit v_[maxSize];
 	static fp::Op op_;
@@ -231,11 +238,11 @@ public:
 	}
 	void setStr(const std::string& str, int ioMode = 0)
 	{
-		if (ioMode & (IoArray | IoArrayRaw)) {
+		if (ioMode & (IoArray | IoArrayRaw | IoTight)) {
 			const size_t n = getByteSize();
 			if (str.size() != n) throw cybozu::Exception("FpT:setStr:bad size") << str.size() << n << ioMode;
 			if (ioMode & IoArrayRaw) {
-				memcpy(v_, str.c_str(), n);
+				fp::copyByteToUnitAsLE(v_, reinterpret_cast<const uint8_t*>(str.c_str()), n);
 				if (!isValid()) throw cybozu::Exception("FpT:setStr:bad value") << str;
 			} else {
 				setArray(&str[0], n);
@@ -268,20 +275,6 @@ public:
 		fp::copyAndMask(v_, inBuf, sizeof(S) * n, op_, true);
 		toMont();
 	}
-	template<class S>
-	size_t getArray(S *outBuf, size_t n) const
-	{
-		const size_t SbyteSize = sizeof(S) * n;
-		const size_t fpByteSize = sizeof(Unit) * op_.N;
-		if (SbyteSize < fpByteSize) throw cybozu::Exception("FpT:getArray:bad n") << n << fpByteSize;
-		assert(SbyteSize >= fpByteSize);
-		fp::Block b;
-		getBlock(b);
-		memcpy(outBuf, b.p, fpByteSize);
-		const size_t writeN = (fpByteSize + sizeof(S) - 1) / sizeof(S);
-		memset((char *)outBuf + fpByteSize, 0, writeN * sizeof(S) - fpByteSize);
-		return writeN;
-	}
 	void getBlock(fp::Block& b) const
 	{
 		b.n = op_.N;
@@ -312,17 +305,16 @@ public:
 	}
 	void getStr(std::string& str, int ioMode = 10) const
 	{
-		const size_t n = getByteSize();
-		if (ioMode & IoArrayRaw) {
-			str.resize(n);
-			memcpy(&str[0], v_, str.size());
-			return;
-		}
 		fp::Block b;
-		getBlock(b);
-		if (ioMode & IoArray) {
+		const size_t n = getByteSize();
+		const Unit *p = v_;
+		if (!(ioMode & IoArrayRaw)) {
+			getBlock(b);
+			p = b.p;
+		}
+		if (ioMode & (IoArray | IoArrayRaw | IoTight)) {
 			str.resize(n);
-			memcpy(&str[0], b.p, str.size());
+			fp::copyUnitToByteAsLE(reinterpret_cast<uint8_t*>(&str[0]), p, str.size());
 			return;
 		}
 		fp::arrayToStr(str, b.p, b.n, ioMode & ~IoPrefix, (ioMode & IoPrefix) != 0);
@@ -420,7 +412,7 @@ public:
 	{
 		int ioMode = fp::detectIoMode(getIoMode(), is);
 		std::string str;
-		if (ioMode & (IoArray | IoArrayRaw)) {
+		if (ioMode & (IoArray | IoArrayRaw | IoTight)) {
 			str.resize(getByteSize());
 			is.read(&str[0], str.size());
 		} else {

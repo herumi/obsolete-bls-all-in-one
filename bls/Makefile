@@ -9,7 +9,7 @@ TEST_SRC=bls_test.cpp bls_if_test.cpp
 SAMPLE_SRC=bls_smpl.cpp bls_tool.cpp
 
 CFLAGS+=-I../mcl/include
-UNIT?=4
+UNIT?=6
 ifeq ($(UNIT),4)
   CFLAGS+=-DBLS_MAX_OP_UNIT_SIZE=4
   GO_TAG=bn256
@@ -34,8 +34,6 @@ MCL_LIB=../mcl/lib/libmcl.a
 
 $(MCL_LIB):
 	$(MAKE) -C ../mcl
-
-.PHONY: $(MCL_LIB)
 
 ##################################################################
 
@@ -67,11 +65,11 @@ test: $(TEST_EXE)
 	@sh -ec 'for i in $(TEST_EXE); do $$i|grep "ctest:name"; done' > result.txt
 	@grep -v "ng=0, exception=0" result.txt; if [ $$? -eq 1 ]; then echo "all unit tests succeed"; else exit 1; fi
 
-run_go: go/main.go $(BLS_LIB) $(BLS_IF_LIB)
-	cd go && go run -tags $(GO_TAG) main.go
+run_go: go/main_test.go $(BLS_LIB) $(BLS_IF_LIB)
+	cd go && go test -tags $(GO_TAG) -v .
 
 clean:
-	$(RM) $(BLS_LIB) $(OBJ_DIR)/* $(EXE_DIR)/*.exe $(GEN_EXE) $(ASM_SRC) $(ASM_OBJ) $(LIB_OBJ) $(LLVM_SRC) $(BLS_IF_LIB)
+	$(RM) $(BLS_LIB) $(OBJ_DIR)/*.d $(OBJ_DIR)/*.o $(EXE_DIR)/*.exe $(GEN_EXE) $(ASM_SRC) $(ASM_OBJ) $(LIB_OBJ) $(LLVM_SRC) $(BLS_IF_LIB)
 
 ALL_SRC=$(SRC_SRC) $(TEST_SRC) $(SAMPLE_SRC)
 DEPEND_FILE=$(addprefix $(OBJ_DIR)/, $(ALL_SRC:.cpp=.d))

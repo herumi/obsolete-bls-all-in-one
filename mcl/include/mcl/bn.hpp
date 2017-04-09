@@ -200,60 +200,51 @@ struct MapToT {
 };
 
 /*
-	Skew Frobenius Map and Efficient Scalar Multiplication for Pairing-Based Cryptography
-	Y. Sakemi, Y. Nogami, K. Okeya, H. Kato, Y. Morikawa
+	Software implementation of Attribute-Based Encryption: Appendixes
 */
 template<class Fp>
 struct GLV {
 	typedef mcl::EcT<Fp> G1;
-	Fp w; // (-1 + sqrt(-3)) / 2
+	Fp rw; // rw = 1 / w = (-1 - sqrt(-3)) / 2
+	size_t m;
+	mpz_class v0, v1;
+	mpz_class B[2][2];
 	mpz_class r;
-	mpz_class z;
-	bool isNegative;
-	mpz_class v; // 6z^2 + 4z + 1 > 0
-	mpz_class c; // 2z + 1
-	void init(const mpz_class& r, const mpz_class& z, bool isNegative)
+	void init(const mpz_class& r, const mpz_class& z)
 	{
-		if (!Fp::squareRoot(w, -3)) throw cybozu::Exception("GLV:init");
-		w = (w - 1) / 2;
+		if (!Fp::squareRoot(rw, -3)) throw cybozu::Exception("GLV:init");
+		rw = -(rw + 1) / 2;
 		this->r = r;
-		this->z = z;
-		this->isNegative = isNegative;
-		v = 1 + z * (4 + z * 6);
-		c = 2 * z + 1;
+		m = gmp::getBitSize(r);
+		m = (m + fp::UnitBitSize - 1) & ~(fp::UnitBitSize - 1);// a little better size
+		v0 = ((6 * z * z + 4 * z + 1) << m) / r;
+		v1 = ((-2 * z - 1) << m) / r;
+		B[0][0] = 6 * z * z + 2 * z;
+		B[0][1] = -2 * z - 1;
+		B[1][0] = -2 * z - 1;
+		B[1][1] = -6 * z * z - 4 * z - 1;
 	}
 	/*
-		(p^2 mod r) (x, y) = (wx, -y)
+		lambda = 36z^4 - 1
+		lambda (x, y) = (rw x, y)
 	*/
-	void mulP2(G1& Q, const G1& P) const
+	void mulLambda(G1& Q, const G1& P) const
 	{
-		Fp::mul(Q.x, P.x, w);
-		Fp::neg(Q.y, P.y);
+		Fp::mul(Q.x, P.x, rw);
+		Q.y = P.y;
 		Q.z = P.z;
 	}
 	/*
-		s = ap^2 + b mod r
-		assume(s < r);
+		lambda = 36 z^4 - 1
+		x = a + b * lambda mod r
 	*/
-	void getAB(mpz_class& a, mpz_class& b, const mpz_class& s) const
+	void split(mpz_class& a, mpz_class& b, const mpz_class& x) const
 	{
-		assert(0 < s && s < r);
-		/*
-			s = s1 * v + s2                  // s1 = s / v, s2 = s % v
-			= s1 * c * p^2 + s2              // vP = cp^2 P
-			= (s3 * v + s4) * p^2 + s2       // s3 = (s1 * c) / v, s4 = (s1 * c) % v
-			= (s3 * c * p^2 + s4) * p^2 + s2
-			= (s3 * c) * p^4 + s4 * p^2 + s2 // s5 = s3 * c, p^4 = p^2 - 1
-			= s5 * (p^2 - 1) + s4 * p^2 + s2
-			= (s4 + s5) * p^2 + (s2 - s5)
-		*/
 		mpz_class t;
-		mcl::gmp::divmod(a, t, s, v); // a = t / v, t = t % v
-		a *= c;
-		mcl::gmp::divmod(b, a, a, v); // b = a / v, a = a % v
-		b *= c;
-		a += b;
-		b = t - b;
+		t = (x * v0) >> m;
+		b = (x * v1) >> m;
+		a = x - (t * B[0][0] + b * B[1][0]);
+		b = - (t * B[0][1] + b * B[1][1]);
 	}
 	void mul(G1& Q, G1 P, mpz_class x, bool constTime = false) const
 	{
@@ -263,92 +254,74 @@ struct GLV {
 			return;
 		}
 		if (x < 0) {
-			G1::neg(P, P);
-			x = -x;
+			x += r;
 		}
 		mpz_class a, b;
-		getAB(a, b, x);
-		// Q = (ap^2 + b)P
-		G1 A, B;
-		mulP2(A, P);
+		split(a, b, x);
+		G1 A;
+		if (a < 0) {
+			G1::neg(A, P);
+			a = -a;
+		} else {
+			A = P;
+		}
 		if (b < 0) {
+			G1::neg(Q, P);
 			b = -b;
-			G1::neg(P, P);
-		}
-		assert(a >= 0);
-		assert(b >= 0);
-#if 1
-		size_t nA = mcl::gmp::getBitSize(a);
-		size_t nB = mcl::gmp::getBitSize(b);
-		size_t n = std::max(nA, nB);
-		assert(n > 0);
-#if 0 // slow
-		G1 tbl[16];
-		tbl[0].clear();
-		tbl[1] = A;
-		G1::dbl(tbl[2], tbl[1]);
-		G1::add(tbl[3], tbl[2], tbl[1]);
-		for (int i = 1; i < 4; i++) {
-			for (int j = 0; j < 4; j++) {
-				G1::add(tbl[i * 4 + j], tbl[(i - 1) * 4 + j], P);
-			}
-		}
-		for (int i = 1; i < 16; i++) {
-			tbl[i].normalize();
-		}
-		if (n & 1) {
-			n--;
-			bool ai = mcl::gmp::testBit(a, n);
-			bool bi = mcl::gmp::testBit(b, n);
-			unsigned int idx = bi * 4 + ai;
-			Q = tbl[idx];
-			if (n == 0) return;
 		} else {
-			Q.clear();
+			Q = P;
 		}
-		for (int i = (int)n - 2; i >= 0; i -= 2) {
-			G1::dbl(Q, Q);
-			G1::dbl(Q, Q);
-			bool a0 = mcl::gmp::testBit(a, i + 0);
-			bool a1 = mcl::gmp::testBit(a, i + 1);
-			bool b0 = mcl::gmp::testBit(b, i + 0);
-			bool b1 = mcl::gmp::testBit(b, i + 1);
-			unsigned int c = b1 * 8 + b0 * 4 + a1 * 2 + a0;
-			if (c > 0) {
-				Q += tbl[c];
-			}
-		}
+		mulLambda(Q, Q);
+#if 0
+		G1::mulBase(A, A, a);
+		G1::mulBase(Q, Q, b);
+		Q += A;
 #else
-		G1 tbl[4];
-		tbl[1] = A; tbl[1].normalize();
-		tbl[2] = P; tbl[2].normalize();
-		tbl[3] = A + P; tbl[3].normalize();
-		Q.clear();
-		if (constTime) {
-			tbl[0] = tbl[1];
-			for (int i = (int)n - 1; i >= 0; i--) {
-				G1::dbl(Q, Q);
-				bool ai = mcl::gmp::testBit(a, i);
-				bool bi = mcl::gmp::testBit(b, i);
-				unsigned int c = bi * 2 + ai;
-				Q += tbl[c];
-			}
+		A.normalize();
+		Q.normalize();
+		G1 tbl[4] = { A, A, Q, A + Q }; // tbl[0] : dummy
+		tbl[3].normalize();
+		typedef mcl::fp::Unit Unit;
+		const int aN = (int)mcl::gmp::getUnitSize(a);
+		const int bN = (int)mcl::gmp::getUnitSize(b);
+		const Unit *pa = mcl::gmp::getUnit(a);
+		const Unit *pb = mcl::gmp::getUnit(b);
+		const int maxN = std::max(aN, bN);
+		assert(maxN > 0);
+		int ma = -1, mb = -1;
+		if (aN == maxN) {
+			ma = cybozu::bsr<Unit>(pa[maxN - 1]);
+		}
+		if (bN == maxN) {
+			mb = cybozu::bsr<Unit>(pb[maxN - 1]);
+		}
+		int m = ma;
+		if (ma > mb) {
+			Q = tbl[1];
+		} else if (ma < mb) {
+			Q = tbl[2];
+			m = mb;
 		} else {
-			for (int i = (int)n - 1; i >= 0; i--) {
+			assert(ma == mb);
+			Q = tbl[3];
+		}
+		G1 *pTbl[] = { &tbl[0], &Q, &Q, &Q };
+		for (int i = maxN - 1; i >= 0; i--) {
+			Unit va = i < aN ? pa[i] : 0;
+			Unit vb = i < bN ? pb[i] : 0;
+			for (int j = m - 1; j >= 0; j -= 1) {
 				G1::dbl(Q, Q);
-				bool ai = mcl::gmp::testBit(a, i);
-				bool bi = mcl::gmp::testBit(b, i);
-				unsigned int c = bi * 2 + ai;
-				if (c > 0) {
+				Unit ai = (va >> j) & 1;
+				Unit bi = (vb >> j) & 1;
+				Unit c = bi * 2 + ai;
+				if (constTime) {
+					*pTbl[c] += tbl[c];
+				} else if (c > 0) {
 					Q += tbl[c];
 				}
 			}
+			m = (int)sizeof(Unit) * 8;
 		}
-#endif
-#else
-		G1::mul(A, A, a);
-		G1::mul(B, P, b);
-		G1::add(Q, A, B);
 #endif
 	}
 };
@@ -420,7 +393,7 @@ struct ParamT {
 		G2::init(0, b_div_xi, mcl::ec::Proj);
 		G2::setOrder(r);
 		mapTo.init(2 * p - r);
-		glv.init(r, z, isNegative);
+		glv.init(r, z);
 
 		Fp2::pow(g[0], xi, (p - 1) / 6); // g = xi^((p-1)/6)
 		for (size_t i = 1; i < gN; i++) {

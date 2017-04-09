@@ -48,6 +48,10 @@ size_t blsGetOpUnitSize(void);
 
 blsId *blsIdCreate(void);
 void blsIdDestroy(blsId *id);
+size_t blsIdGetData(const blsId *id, char *buf, size_t maxBufSize);
+int blsIdSetData(blsId *id, const char *buf, size_t bufSize);
+// return 1 if same else 0
+int blsIdIsSame(const blsId *lhs, const blsId *rhs);
 void blsIdPut(const blsId *id);
 void blsIdCopy(blsId *dst, const blsId *src);
 
@@ -67,6 +71,11 @@ void blsIdSet(blsId *id, const uint64_t *p);
 
 blsSecretKey* blsSecretKeyCreate(void);
 void blsSecretKeyDestroy(blsSecretKey *sec);
+size_t blsSecretKeyGetData(const blsSecretKey *sec, char *buf, size_t maxBufSize);
+int blsSecretKeySetData(blsSecretKey *sec, const char *buf, size_t bufSize);
+// return 1 if same else 0
+int blsSecretKeyIsSame(const blsSecretKey *lhs, const blsSecretKey *rhs);
+
 void blsSecretKeyPut(const blsSecretKey *sec);
 void blsSecretKeyCopy(blsSecretKey *dst, const blsSecretKey *src);
 void blsSecretKeySetArray(blsSecretKey *sec, const uint64_t *p);
@@ -77,13 +86,16 @@ void blsSecretKeyAdd(blsSecretKey *sec, const blsSecretKey *rhs);
 void blsSecretKeyInit(blsSecretKey *sec);
 void blsSecretKeyGetPublicKey(const blsSecretKey *sec, blsPublicKey *pub);
 void blsSecretKeySign(const blsSecretKey *sec, blsSign *sign, const char *m, size_t size);
-void blsSecretKeySignCT(const blsSecretKey *sec, blsSign *sign, const char *m, size_t size);
 void blsSecretKeySet(blsSecretKey *sec, const blsSecretKey* msk, size_t k, const blsId *id);
 void blsSecretKeyRecover(blsSecretKey *sec, const blsSecretKey *secVec, const blsId *idVec, size_t n);
 void blsSecretKeyGetPop(const blsSecretKey *sec, blsSign *sign);
 
 blsPublicKey *blsPublicKeyCreate(void);
 void blsPublicKeyDestroy(blsPublicKey *pub);
+size_t blsPublicKeyGetData(const blsPublicKey *pub, char *buf, size_t maxBufSize);
+int blsPublicKeySetData(blsPublicKey *pub, const char *buf, size_t bufSize);
+// return 1 if same else 0
+int blsPublicKeyIsSame(const blsPublicKey *lhs, const blsPublicKey *rhs);
 void blsPublicKeyPut(const blsPublicKey *pub);
 void blsPublicKeyCopy(blsPublicKey *dst, const blsPublicKey *src);
 int blsPublicKeySetStr(blsPublicKey *pub, const char *buf, size_t bufSize);
@@ -94,6 +106,10 @@ void blsPublicKeyRecover(blsPublicKey *pub, const blsPublicKey *pubVec, const bl
 
 blsSign *blsSignCreate(void);
 void blsSignDestroy(blsSign *sign);
+size_t blsSignGetData(const blsSign *sign, char *buf, size_t maxBufSize);
+int blsSignSetData(blsSign *sign, const char *buf, size_t bufSize);
+// return 1 if same else 0
+int blsSignIsSame(const blsSign *lhs, const blsSign *rhs);
 void blsSignPut(const blsSign *sign);
 void blsSignCopy(blsSign *dst, const blsSign *src);
 int blsSignSetStr(blsSign *sign, const char *buf, size_t bufSize);
