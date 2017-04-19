@@ -1172,10 +1172,16 @@ struct BNT {
 #endif
 		exp_d1(y, y);
 	}
-	static void millerLoop(Fp12& f, const G1& P, const G2& Q)
+	static void millerLoop(Fp12& f, const G1& P_, const G2& Q_)
 	{
+		G1 P(P_);
+		G2 Q(Q_);
 		P.normalize();
 		Q.normalize();
+		if (Q.isZero()) {
+			f = 1;
+			return;
+		}
 		G2 T = Q;
 		G2 negQ;
 		if (param.useNAF) {
@@ -1234,10 +1240,17 @@ struct BNT {
 	/*
 		allocate param.precomputedQcoeffSize elements of Fp6 for Qcoeff
 	*/
-	static void precomputeG2(Fp6 *Qcoeff, const G2& Q)
+	static void precomputeG2(Fp6 *Qcoeff, const G2& Q_)
 	{
 		size_t idx = 0;
+		G2 Q(Q_);
 		Q.normalize();
+		if (Q.isZero()) {
+			for (size_t i = 0; i < param.precomputedQcoeffSize; i++) {
+				Qcoeff[i] = 1;
+			}
+			return;
+		}
 		G2 T = Q;
 		G2 negQ;
 		if (param.useNAF) {
@@ -1271,8 +1284,9 @@ struct BNT {
 	{
 		precomputedMillerLoop(f, P, Qcoeff.data());
 	}
-	static void precomputedMillerLoop(Fp12& f, const G1& P, const Fp6* Qcoeff)
+	static void precomputedMillerLoop(Fp12& f, const G1& P_, const Fp6* Qcoeff)
 	{
+		G1 P(P_);
 		P.normalize();
 		size_t idx = 0;
 		Fp6 d, e;
@@ -1312,8 +1326,9 @@ struct BNT {
 	{
 		precomputedMillerLoop2(f, P1, Q1coeff.data(), P2, Q2coeff.data());
 	}
-	static void precomputedMillerLoop2(Fp12& f, const G1& P1, const Fp6* Q1coeff, const G1& P2, const Fp6* Q2coeff)
+	static void precomputedMillerLoop2(Fp12& f, const G1& P1_, const Fp6* Q1coeff, const G1& P2_, const Fp6* Q2coeff)
 	{
+		G1 P1(P1_), P2(P2_);
 		P1.normalize();
 		P2.normalize();
 		size_t idx = 0;

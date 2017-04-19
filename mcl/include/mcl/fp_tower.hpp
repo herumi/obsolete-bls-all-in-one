@@ -119,6 +119,11 @@ public:
 		a.clear();
 		b.clear();
 	}
+	void set(const Fp &a_, const Fp &b_)
+	{
+		a = a_;
+		b = b_;
+	}
 	static void add(Fp2T& z, const Fp2T& x, const Fp2T& y) { Fp::op_.fp2_add(z.a.v_, x.a.v_, y.a.v_); }
 	static void sub(Fp2T& z, const Fp2T& x, const Fp2T& y) { Fp::op_.fp2_sub(z.a.v_, x.a.v_, y.a.v_); }
 	static void addPre(Fp2T& z, const Fp2T& x, const Fp2T& y) { Fp::addPre(z.a, x.a, y.a); Fp::addPre(z.b, x.b, y.b); }
@@ -175,7 +180,6 @@ public:
 	bool isOne() const { return a.isOne() && b.isZero(); }
 	bool operator==(const Fp2T& rhs) const { return a == rhs.a && b == rhs.b; }
 	bool operator!=(const Fp2T& rhs) const { return !operator==(rhs); }
-	void normalize() const {} // dummy method
 	/*
 		return true is a is odd (do not consider b)
 		this function is for only compressed reprezentation of EC
@@ -575,6 +579,12 @@ struct Fp6T : public fp::Operator<Fp6T<Fp> > {
 	const Fp* getFp0() const { return a.getFp0(); }
 	Fp2* getFp2() { return &a; }
 	const Fp2* getFp2() const { return &a; }
+	void set(const Fp2 &a_, const Fp2 &b_, const Fp2 &c_)
+	{
+		a = a_;
+		b = b_;
+		c = c_;
+	}
 	bool isZero() const
 	{
 		return a.isZero() && b.isZero() && c.isZero();
@@ -771,7 +781,6 @@ struct Fp6T : public fp::Operator<Fp6T<Fp> > {
 		Fp2::mul(y.b, p.b, q);
 		Fp2::mul(y.c, p.c, q);
 	}
-	void normalize() const {} // dummy
 };
 
 /*
@@ -915,7 +924,6 @@ struct Fp12T : public fp::Operator<Fp12T<Fp> > {
 	{
 		return a.getStr(ioMode) + fp::getIoSeparator(ioMode) + b.getStr(ioMode);
 	}
-	void normalize() const {} // dummy
 };
 
 } // mcl

@@ -1,4 +1,4 @@
-package blscgo
+package bls
 
 /*
 #cgo CFLAGS:-I../../include -DBLS_MAX_OP_UNIT_SIZE=6
@@ -11,8 +11,13 @@ import "C"
 import "fmt"
 import "unsafe"
 
+// CurveFp254BNb -- 254 bit curve
 const CurveFp254BNb = 0
+
+// CurveFp382_1 -- 382 bit curve 1
 const CurveFp382_1 = 1
+
+// CurveFp382_2 -- 382 bit curve 2
 const CurveFp382_2 = 2
 
 // Init --
@@ -20,12 +25,12 @@ func Init(curve int) {
 	C.blsInit(C.int(curve), C.BLS_MAX_OP_UNIT_SIZE)
 }
 
-// getMaxOpUnitSize --
+// GetMaxOpUnitSize --
 func GetMaxOpUnitSize() int {
 	return int(C.BLS_MAX_OP_UNIT_SIZE)
 }
 
-// getOpUnitSize --
+// GetOpUnitSize --
 func GetOpUnitSize() int {
 	return int(C.blsGetOpUnitSize())
 }
@@ -107,30 +112,30 @@ func (sec *SecretKey) SetStr(s string) error {
 }
 
 // SetData --
-func (sec *SecretKey) SetData(s string) error {
-	buf := []byte(s)
+func (sec *SecretKey) SetData(buf []byte) error {
 	// #nosec
 	err := C.blsSecretKeySetData(sec.getPointer(), (*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf)))
 	if err > 0 {
-		return fmt.Errorf("bad string:%s", s)
+		return fmt.Errorf("bad buf:%s", buf)
 	}
 	return nil
 }
 
 // GetData --
-func (sec *SecretKey) GetData() string {
+func (sec *SecretKey) GetData() []byte {
 	fpSize := GetOpUnitSize() * 8
 	buf := make([]byte, fpSize)
+	// #nosec
 	n := C.blsSecretKeyGetData(sec.getPointer(), (*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf)))
-	if n == 0 {
+	if n != C.size_t(fpSize) {
 		panic("implementation err. size of buf is small")
 	}
-	return string(buf[:n])
+	return buf
 }
 
 // IsSame --
-func (lhs *SecretKey) IsSame(rhs *SecretKey) bool {
-	return C.blsSecretKeyIsSame(lhs.getPointer(), rhs.getPointer()) == 1
+func (sec *SecretKey) IsSame(rhs *SecretKey) bool {
+	return C.blsSecretKeyIsSame(sec.getPointer(), rhs.getPointer()) == 1
 }
 
 // SetArray --
@@ -224,30 +229,30 @@ func (pub *PublicKey) SetStr(s string) error {
 }
 
 // SetData --
-func (sec *PublicKey) SetData(s string) error {
-	buf := []byte(s)
+func (pub *PublicKey) SetData(buf []byte) error {
 	// #nosec
-	err := C.blsPublicKeySetData(sec.getPointer(), (*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf)))
+	err := C.blsPublicKeySetData(pub.getPointer(), (*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf)))
 	if err > 0 {
-		return fmt.Errorf("bad string:%s", s)
+		return fmt.Errorf("bad buf:%s", buf)
 	}
 	return nil
 }
 
 // GetData --
-func (sec *PublicKey) GetData() string {
+func (pub *PublicKey) GetData() []byte {
 	fpSize := GetOpUnitSize() * 8
 	buf := make([]byte, fpSize*2)
-	n := C.blsPublicKeyGetData(sec.getPointer(), (*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf)))
-	if n == 0 {
+	// #nosec
+	n := C.blsPublicKeyGetData(pub.getPointer(), (*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf)))
+	if n != C.size_t(fpSize*2) {
 		panic("implementation err. size of buf is small")
 	}
-	return string(buf[:n])
+	return buf
 }
 
 // IsSame --
-func (lhs *PublicKey) IsSame(rhs *PublicKey) bool {
-	return C.blsPublicKeyIsSame(lhs.getPointer(), rhs.getPointer()) == 1
+func (pub *PublicKey) IsSame(rhs *PublicKey) bool {
+	return C.blsPublicKeyIsSame(pub.getPointer(), rhs.getPointer()) == 1
 }
 
 // Add --
@@ -299,30 +304,30 @@ func (sign *Sign) SetStr(s string) error {
 }
 
 // SetData --
-func (sec *Sign) SetData(s string) error {
-	buf := []byte(s)
+func (sign *Sign) SetData(buf []byte) error {
 	// #nosec
-	err := C.blsSignSetData(sec.getPointer(), (*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf)))
+	err := C.blsSignSetData(sign.getPointer(), (*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf)))
 	if err > 0 {
-		return fmt.Errorf("bad string:%s", s)
+		return fmt.Errorf("bad buf:%s", buf)
 	}
 	return nil
 }
 
 // GetData --
-func (sec *Sign) GetData() string {
+func (sign *Sign) GetData() []byte {
 	fpSize := GetOpUnitSize() * 8
 	buf := make([]byte, fpSize)
-	n := C.blsSignGetData(sec.getPointer(), (*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf)))
-	if n == 0 {
+	// #nosec
+	n := C.blsSignGetData(sign.getPointer(), (*C.char)(unsafe.Pointer(&buf[0])), C.size_t(len(buf)))
+	if n != C.size_t(fpSize) {
 		panic("implementation err. size of buf is small")
 	}
-	return string(buf[:n])
+	return buf
 }
 
 // IsSame --
-func (lhs *Sign) IsSame(rhs *Sign) bool {
-	return C.blsSignIsSame(lhs.getPointer(), rhs.getPointer()) == 1
+func (sign *Sign) IsSame(rhs *Sign) bool {
+	return C.blsSignIsSame(sign.getPointer(), rhs.getPointer()) == 1
 }
 
 // GetPublicKey --
@@ -332,7 +337,7 @@ func (sec *SecretKey) GetPublicKey() (pub *PublicKey) {
 	return pub
 }
 
-// Constant Time Sign --
+// Sign -- Constant Time version
 func (sec *SecretKey) Sign(m string) (sign *Sign) {
 	sign = new(Sign)
 	buf := []byte(m)
